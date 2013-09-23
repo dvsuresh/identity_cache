@@ -24,15 +24,20 @@ module IdentityCache
       # ActiveRecord::Base.find_by_id
       def fetch_by_id(id)
         raise NotImplementedError, "fetching needs the primary index enabled" unless primary_cache_index_enabled
-        if IdentityCache.should_cache?
+        begin
+          if IdentityCache.should_cache?
 
-          require_if_necessary do
-            object = IdentityCache.fetch(rails_cache_key(id)){ resolve_cache_miss(id) }
-            IdentityCache.logger.error "[IDC id mismatch] fetch_by_id_requested=#{id} fetch_by_id_got=#{object.id} for #{object.inspect[(0..100)]} " if object && object.id != id.to_i
-            object
+            require_if_necessary do
+              object = IdentityCache.fetch(rails_cache_key(id)){ resolve_cache_miss(id) }
+              IdentityCache.logger.error "[IDC id mismatch] fetch_by_id_requested=#{id} fetch_by_id_got=#{object.id} for #{object.inspect[(0..100)]} " if object && object.id != id.to_i
+              object
+            end
+
+          else
+            self.find_by_id(id)
           end
-
-        else
+        rescue Memcached::ServerIsMarkedDead => e
+          puts "IdentityCache Rescue in file: #{__FILE__}, line: #{__LINE__}, exception: #{e.inspect}"
           self.find_by_id(id)
         end
       end
